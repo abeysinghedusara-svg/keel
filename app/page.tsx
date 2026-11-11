@@ -31,8 +31,8 @@ export default function Home() {
                 <br />A steadier <em>firm.</em>
               </h1>
               <p className="hero-description">
-                Dedicated, legally trained people who take care of the details.
-                So you can get back to the work that matters.
+                Remote, legally trained team members who take care of the
+                details. So you can get back to the work that matters.
               </p>
               <div className="hero-actions">
                 <a className="button button-gold" href="#contact">

@@ -544,7 +544,7 @@ section[id] {
 
 .scene-caption {
   position: absolute;
-  top: 44px;
+  top: 34px;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -703,7 +703,7 @@ section[id] {
 
 .scene-note {
   position: absolute;
-  bottom: 57px;
+  bottom: 22px;
   right: 14px;
   display: flex;
   align-items: center;
@@ -2165,7 +2165,7 @@ section[id] {
     letter-spacing: 1px;
   }
   .scene-note {
-    bottom: 40px;
+    bottom: 12px;
     right: 7px;
     padding: 10px;
     gap: 7px;
@@ -2495,7 +2495,7 @@ section[id] {
     justify-self: center;
   }
   .scene-caption {
-    top: 31px;
+    top: 23px;
     font-size: 7px;
   }
   .workspace {
@@ -2534,7 +2534,7 @@ section[id] {
   }
   .scene-note {
     right: 16px;
-    bottom: 30px;
+    bottom: 9px;
     padding: 12px 14px;
   }
   .scene-note strong {
