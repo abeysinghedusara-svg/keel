@@ -1,0 +1,29 @@
+{
+  "brandId": "keel-talent",
+  "seoGenie": {
+    "crawlUrl": "https://keeltalentgroup.com",
+    "publicUrl": "https://keeltalentgroup.com",
+    "maxPages": 20,
+    "language": "en",
+    "market": "US, UK, Australia, Canada, New Zealand",
+    "artifactsDir": ".seo-genie",
+    "profileOverrides": {},
+    "keywordSeeds": [
+      {"query": "what tasks can a legal assistant handle", "title": "What tasks can a legal assistant handle?", "offering": "legal", "intent": "informational"},
+      {"query": "how to onboard a remote legal assistant", "title": "How to onboard a remote legal assistant", "offering": "legal", "intent": "informational"},
+      {"query": "law firm client intake checklist", "title": "A practical client intake checklist for law firms", "offering": "legal", "intent": "informational"},
+      {"query": "outsourced legal support", "title": "Outsourced legal support for your firm", "offering": "legal", "intent": "transactional"},
+      {"query": "KYC onboarding workflow checklist", "title": "Building a consistent KYC onboarding workflow", "offering": "compliance", "intent": "informational"},
+      {"query": "compliance documentation handover checklist", "title": "A practical compliance documentation handover", "offering": "compliance", "intent": "informational"}
+    ]
+  },
+  "generation": {"mode": "coding-session"},
+  "publishing": {
+    "adapter": "sanity",
+    "mode": "draft",
+    "projectId": "1bjuvz0g",
+    "dataset": "production",
+    "apiVersion": "2026-11-14",
+    "writeTokenEnv": "SANITY_API_WRITE_TOKEN"
+  }
+}

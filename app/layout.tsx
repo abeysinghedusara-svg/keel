@@ -3,6 +3,7 @@ import { Providers } from "@/app/providers";
 import "./globals.css";
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://keeltalentgroup.com"),
   title: "Keel Talent | Specialist Legal & Compliance Support",
   description:
     "Dedicated, legally trained team members for your firm. Carefully vetted law graduates, trained on your systems and supported by Keel Talent.",

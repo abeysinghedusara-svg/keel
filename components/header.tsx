@@ -1,12 +1,14 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { navigation } from "@/lib/content";
 import { Icon } from "@/components/icons";
 
-export function Header() {
+export function Header({ home = true }: { home?: boolean }) {
+  const homePath = home ? "" : "/";
   const [open, setOpen] = useState(false);
   const toggleRef = useRef<HTMLButtonElement>(null);
   const reduced = useReducedMotion();
@@ -30,7 +32,7 @@ export function Header() {
   return (
     <header className="site-header">
       <div className="header-inner">
-        <a href="#top" aria-label="Keel Talent home" className="brand">
+        <a href={home ? "#top" : "/"} aria-label="Keel Talent home" className="brand">
           <Image
             src="/brand/keel-logo.png"
             width={190}
@@ -41,13 +43,14 @@ export function Header() {
         </a>
         <nav className="desktop-nav" aria-label="Main navigation">
           {navigation.map(([label, id]) => (
-            <a key={id} href={`#${id}`}>
+            <a key={id} href={`${homePath}#${id}`}>
               {label}
             </a>
           ))}
+          <Link href="/blog" aria-current={!home ? "location" : undefined}>Insights</Link>
         </nav>
         <div className="header-actions">
-          <a href="#contact" className="button button-small button-gold">
+          <a href={`${homePath}#contact`} className="button button-small button-gold">
             Let’s talk <Icon name="arrow" size={16} />
           </a>
           <button
@@ -74,11 +77,12 @@ export function Header() {
             transition={{ duration: reduced ? 0 : 0.25 }}
           >
             {navigation.map(([label, id]) => (
-              <a key={id} href={`#${id}`} onClick={() => setOpen(false)}>
+              <a key={id} href={`${homePath}#${id}`} onClick={() => setOpen(false)}>
                 {label}
                 <Icon name="arrow" size={17} />
               </a>
             ))}
+            <Link href="/blog" onClick={() => setOpen(false)}>Insights<Icon name="arrow" size={17} /></Link>
           </motion.nav>
         )}
       </AnimatePresence>

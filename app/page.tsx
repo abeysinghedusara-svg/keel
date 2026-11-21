@@ -1,4 +1,3 @@
-import Image from "next/image";
 import { BrandLoader } from "@/components/brand-loader";
 import { Header } from "@/components/header";
 import { HeroScene } from "@/components/hero-scene";
@@ -8,7 +7,7 @@ import { Faq } from "@/components/faq";
 import { ContactForm } from "@/components/contact-form";
 import { Reveal } from "@/components/motion";
 import { Icon } from "@/components/icons";
-import { navigation } from "@/lib/content";
+import { SiteFooter } from "@/components/site-footer";
 
 export default function Home() {
   return (
@@ -89,7 +88,7 @@ export default function Home() {
           >
             <Reveal className="section-heading">
               <div>
-                <span className="eyebrow">01 — ROOM TO DO MORE</span>
+                <span className="eyebrow">01 · ROOM TO DO MORE</span>
                 <h2 id="services-title">
                   Your expertise.
                   <br />
@@ -116,7 +115,7 @@ export default function Home() {
           <section id="why" className="why-section" aria-labelledby="why-title">
             <div className="section-shell why-inner">
               <Reveal className="why-intro">
-                <span className="eyebrow">02 — THE KEEL DIFFERENCE</span>
+                <span className="eyebrow">02 · THE KEEL DIFFERENCE</span>
                 <h2 id="why-title">
                   An extension of
                   <br />
@@ -177,7 +176,7 @@ export default function Home() {
               <Reveal className="section-heading">
                 <div>
                   <span className="eyebrow light">
-                    03 — A CLEAR PATH FORWARD
+                    03 · A CLEAR PATH FORWARD
                   </span>
                   <h2 id="how-title">
                     Simple from the <em>first call.</em>
@@ -234,7 +233,7 @@ export default function Home() {
             aria-labelledby="faq-title"
           >
             <Reveal className="faq-heading">
-              <span className="eyebrow">04 — A LITTLE MORE CLARITY</span>
+              <span className="eyebrow">04 · A LITTLE MORE CLARITY</span>
               <h2 id="faq-title">
                 Good questions.
                 <br />
@@ -289,44 +288,7 @@ export default function Home() {
             </a>
           </div>
         </main>
-        <footer className="site-footer">
-          <div className="section-shell">
-            <div className="footer-top">
-              <div>
-                <a href="#top" aria-label="Keel Talent home">
-                  <Image
-                    src="/brand/keel-logo.png"
-                    width={200}
-                    height={47}
-                    alt="Keel Talent"
-                  />
-                </a>
-                <p>Good people. Steady growth.</p>
-              </div>
-              <nav aria-label="Footer navigation">
-                {navigation.map(([label, id]) => (
-                  <a key={id} href={`#${id}`}>
-                    {label}
-                  </a>
-                ))}
-                <a href="mailto:careers@keeltalentgroup.com">Careers</a>
-              </nav>
-              <a className="back-to-top" href="#top">
-                Back to top <Icon name="arrow" size={15} />
-              </a>
-            </div>
-            <div className="footer-bottom">
-              <p>
-                © {new Date().getFullYear()} Keel Talent · Colombo, Sri Lanka
-              </p>
-              <p>
-                Keel Talent is not a law firm and does not provide legal advice.
-                Our team members work under the direction and supervision of our
-                clients’ lawyers.
-              </p>
-            </div>
-          </div>
-        </footer>
+        <SiteFooter />
       </div>
     </>
   );
