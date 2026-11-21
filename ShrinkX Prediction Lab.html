@@ -1,0 +1,987 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ShrinkX Prediction Lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* Layout idea: a guided lab bench. A step rail on top, one step at a time, explanation left, something to touch right. */
+:root{
+  --bg:#f2f5f9; --panel:#ffffff; --ink:#15202c; --muted:#5a6879; --line:#d8dfe8;
+  --accent:#1d5c8f; --accent-soft:rgba(29,92,143,.16);
+  --im:#7a8696; --data:#c27612; --data-soft:rgba(194,118,18,.16);
+  --good:#1f7a4d; --warn:#a87400; --bad:#b3362b; --bad-soft:rgba(179,54,43,.13);
+  --display:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0e141b; --panel:#171f2a; --ink:#e6ebf2; --muted:#93a0b2; --line:#2a3544;
+    --accent:#6fb1e6; --accent-soft:rgba(111,177,230,.2); --im:#8794a6; --data:#f0a43a; --data-soft:rgba(240,164,58,.18);
+    --good:#4cc38a; --warn:#e2b23c; --bad:#f07167; --bad-soft:rgba(240,113,103,.16); color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0e141b; --panel:#171f2a; --ink:#e6ebf2; --muted:#93a0b2; --line:#2a3544;
+  --accent:#6fb1e6; --accent-soft:rgba(111,177,230,.2); --im:#8794a6; --data:#f0a43a; --data-soft:rgba(240,164,58,.18);
+  --good:#4cc38a; --warn:#e2b23c; --bad:#f07167; --bad-soft:rgba(240,113,103,.16); color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.55}
+button,input,select{font-family:inherit}
+.wrap{max-width:1240px;margin:0 auto;padding:20px 18px 56px;display:grid;gap:14px}
+h1{font-size:26px;line-height:1.15;margin:0;font-weight:700;letter-spacing:-.01em;text-wrap:balance}
+h2{font-size:22px;line-height:1.2;margin:0;font-weight:700;text-wrap:balance}
+h3{font-size:15px;margin:0;font-weight:600;text-wrap:balance}
+.sub{color:var(--muted);margin:4px 0 0;font-size:14px;max-width:80ch}
+.small{font-size:12.5px;color:var(--muted);margin:0}
+header{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-end;gap:12px}
+
+/* step rail */
+.rail{display:flex;gap:8px;overflow-x:auto;padding:2px 2px 8px;scrollbar-width:thin}
+.pillstep{flex:1 0 128px;text-align:left;border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:10px;padding:8px 10px;cursor:pointer;display:grid;gap:1px}
+.pillstep .n{font:600 11px var(--mono);color:var(--muted)}
+.pillstep .t{font-weight:600;font-size:13.5px;line-height:1.25}
+.pillstep .s{font-size:11.5px;color:var(--muted)}
+.pillstep[aria-current="step"]{border-color:var(--accent);background:var(--accent-soft)}
+.pillstep[aria-current="step"] .n{color:var(--accent)}
+.pillstep.done .n::after{content:" ·";color:var(--good)}
+button:focus-visible,input:focus-visible,select:focus-visible,.term:focus-visible,canvas:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+/* context bar */
+.ctx{position:sticky;top:0;z-index:5;background:var(--bg);padding:8px 0;border-bottom:1px solid var(--line);display:flex;flex-wrap:wrap;gap:14px;align-items:center}
+.ctx .lbl{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;font-weight:600}
+.ctx .grp{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--panel)}
+.seg button{border:0;background:transparent;color:var(--muted);font:600 13px var(--body);padding:7px 13px;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--panel)}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:999px;padding:4px 10px;font:500 12.5px var(--body);cursor:pointer;display:inline-flex;gap:6px;align-items:center}
+.chip small{color:var(--muted);font-family:var(--mono);font-size:11px}
+.chip[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft)}
+.btn{border:1px solid var(--accent);background:var(--accent);color:var(--panel);font:600 13px var(--body);padding:7px 13px;border-radius:8px;cursor:pointer}
+.btn.ghost{background:transparent;color:var(--accent)}
+.btn:disabled{opacity:.45;cursor:default}
+
+/* step layout */
+.step{display:none;grid-template-columns:minmax(0,5fr) minmax(0,7fr);gap:18px;align-items:start}
+.step.on{display:grid}
+@media (max-width:960px){.step.on{grid-template-columns:1fr}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px;display:grid;gap:12px;align-content:start}
+.col{display:grid;gap:14px;align-content:start;min-width:0}
+.story p{margin:0;max-width:62ch}
+.col>*,.story>*,.card>*{min-width:0}
+details.math{min-width:0;max-width:100%}
+.story{display:grid;gap:12px}
+.oneline{border-left:4px solid var(--accent);background:var(--accent-soft);padding:10px 14px;border-radius:0 8px 8px 0;font-weight:500}
+.analogy{border:1px dashed var(--line);border-radius:10px;padding:10px 14px;color:var(--muted);font-size:14px}
+.analogy b{color:var(--ink)}
+.try{border:1px solid var(--data);background:var(--data-soft);border-radius:10px;padding:10px 14px;font-size:14px}
+.try b{display:block;margin-bottom:4px;font-size:12px;text-transform:uppercase;letter-spacing:.07em;color:var(--data)}
+.try ul{margin:0;padding-left:18px;display:grid;gap:4px}
+details.math{border:1px solid var(--line);border-radius:10px;background:var(--panel)}
+details.math summary{cursor:pointer;padding:10px 14px;font-weight:600;font-size:14px}
+details.math .eq{margin:0 14px 14px}
+.eq{font-family:var(--mono);font-size:12.6px;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px 12px;overflow-x:auto;white-space:pre;line-height:1.65;font-variant-numeric:tabular-nums}
+.eq b{color:var(--accent);font-weight:600} .eq i{color:var(--data);font-style:normal;font-weight:600}
+
+/* terms */
+.term{border-bottom:1px dotted var(--muted);cursor:help;position:relative}
+.term::after{content:attr(data-tip);position:absolute;left:0;top:calc(100% + 6px);width:max-content;max-width:min(260px,70vw);background:var(--ink);color:var(--panel);padding:7px 10px;border-radius:8px;font:400 12.5px/1.4 var(--body);display:none;z-index:20;white-space:normal;text-align:left}
+.term:hover::after,.term:focus::after{display:block}
+
+/* controls */
+.field{display:grid;gap:4px}
+.field label,.lab{font-size:13px;color:var(--muted)}
+.val{font-family:var(--mono);color:var(--ink)}
+input[type=range]{width:100%;accent-color:var(--accent)}
+input[type=number],select{font:500 13px var(--mono);padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink);width:100%}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.tests{display:flex;flex-wrap:wrap;gap:6px;min-height:30px}
+.test{font:13px var(--mono);border:1px solid var(--data);border-radius:6px;padding:3px 4px 3px 8px;display:inline-flex;align-items:center;gap:4px}
+.test button{border:0;background:transparent;color:var(--muted);cursor:pointer;font-size:14px;line-height:1;padding:2px 4px;border-radius:4px}
+.test button:hover{color:var(--bad)}
+
+/* visuals */
+canvas{display:block;width:100%;touch-action:pan-y}
+#cvStrip{height:350px;cursor:grab} #cvBase{height:300px} #cvCol{height:300px;cursor:crosshair}
+#cvPred{height:320px} #cvDec{height:320px;cursor:ew-resize} #cvRep{height:340px;cursor:pointer}
+.legend{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12.5px;color:var(--muted)}
+.legend span{display:inline-flex;gap:6px;align-items:center}
+.sw{width:18px;height:10px;border-radius:2px;display:inline-block}
+.dot{width:10px;height:10px;border-radius:50%;display:inline-block}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px}
+.tile{border:1px solid var(--line);border-radius:10px;padding:10px 12px;display:grid;gap:2px;background:var(--panel)}
+.tile .k{font-size:12px;color:var(--muted)}
+.tile .v{font:600 20px var(--mono);font-variant-numeric:tabular-nums}
+.tile .v small{font-size:12px;color:var(--muted);font-weight:500}
+.pill{display:inline-block;font:700 13px var(--body);padding:4px 11px;border-radius:999px;color:#fff;letter-spacing:.02em}
+.pill.LOW{background:var(--good)} .pill.MEDIUM{background:var(--warn)} .pill.HIGH{background:var(--bad)}
+.bar{display:flex;height:24px;border-radius:6px;overflow:hidden;border:1px solid var(--line);font:600 11.5px var(--mono)}
+.bar div{display:flex;align-items:center;justify-content:center;color:#fff;white-space:nowrap;overflow:hidden;min-width:0;transition:flex-basis .3s}
+@media (prefers-reduced-motion: reduce){.bar div{transition:none}}
+svg text{font-family:var(--mono);font-size:11px;fill:var(--muted)}
+.readout{font-size:14px;display:grid;gap:3px}
+.readout b{font-family:var(--mono);font-weight:600}
+.callout{border-radius:10px;padding:10px 12px;font-size:14px;border:1px solid var(--line);background:var(--bg)}
+.callout.good{border-color:var(--good)} .callout.bad{border-color:var(--bad)} .callout.warn{border-color:var(--warn)}
+.pager{display:flex;justify-content:space-between;gap:10px;align-items:center;margin-top:4px}
+.foot{color:var(--muted);font-size:12.5px;max-width:95ch}
+.recap{display:grid;gap:4px;font-size:14px}
+.recap div{display:flex;gap:10px;align-items:baseline}
+.recap span{font:600 11px var(--mono);color:var(--accent);min-width:60px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>ShrinkX Prediction Lab</h1>
+      <p class="sub">A hands-on walkthrough of the maths. Data: IM 1034625, 90/10 recycled poly / elastane single jersey from Teejay Lanka, Residual + Steam shrinkage, SAP inspection Jan to Oct 2026.</p>
+    </div>
+    <button class="btn ghost" id="resetAll">Reset all data and settings</button>
+  </header>
+
+  <nav class="rail" id="rail" aria-label="Steps"></nav>
+
+  <div class="ctx" id="ctx">
+    <div class="grp" id="ctxDir"><span class="lbl">Direction</span>
+      <div class="seg" role="group" aria-label="Direction"><button id="dirL" aria-pressed="true">Length</button><button id="dirW" aria-pressed="false">Width</button></div>
+    </div>
+    <div class="grp" id="ctxCol"><span class="lbl">Colour</span><div class="chips" id="colours"></div></div>
+  </div>
+
+  <!-- 1 PROBLEM -->
+  <section class="step" id="s-problem">
+    <div class="col story">
+      <h2>Nobody knows how much a roll will shrink until it has been steamed</h2>
+      <p>Knit fabric relaxes when it meets steam and heat. A body panel cut at 70 cm can finish at 69 cm. If the cutting room doesn't know by how much, garments come out the wrong size, and rolls with different shrinkage get mixed in one cut and twist apart in the finished garment.</p>
+      <p>Today the answer comes from a physical test. About one roll in ten gets a panel cut off, steamed, measured and logged in SAP. That is slow, it uses fabric, and most batches of the same fabric come back with almost the same number.</p>
+      <div class="oneline">ShrinkX uses probability to say how much a batch will shrink, and how sure it is. You test only the batches it is unsure about.</div>
+      <div class="try"><b>Try this</b><ul>
+        <li>Drag the shrinkage sliders and watch a real 70 cm panel change in millimetres.</li>
+        <li>Make the two rolls differ by 0.4%, then raise the magnifier to see why mixed rolls misalign.</li>
+        <li>Slide "Batches ShrinkX could clear" to see what the fabric alone saves. This cost uses your Sheet1 numbers.</li>
+      </ul></div>
+    </div>
+    <div class="col">
+      <div class="card">
+        <h3>What does X% shrinkage do to a garment panel?</h3>
+        <div class="grid3">
+          <div class="field"><label for="pL">Length shrink: <span class="val" id="pLv"></span></label><input id="pL" type="range" min="-4" max="1" step="0.1" value="-1.1"></div>
+          <div class="field"><label for="pW">Width shrink: <span class="val" id="pWv"></span></label><input id="pW" type="range" min="-4" max="1" step="0.1" value="-1.2"></div>
+          <div class="field"><label for="pMag">Magnify the picture</label><select id="pMag"><option value="1">×1 (true scale)</option><option value="5">×5</option><option value="10" selected>×10</option><option value="20">×20</option></select></div>
+        </div>
+        <div class="row" style="align-items:flex-start;gap:18px">
+          <svg id="swatch" viewBox="0 0 250 236" width="250" height="236" role="img" aria-label="Panel before and after shrinkage"></svg>
+          <div class="readout" id="swRead"></div>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Why rolls are grouped by shrinkage</h3>
+        <div class="grid3">
+          <div class="field"><label for="gA">Roll A: <span class="val" id="gAv"></span></label><input id="gA" type="range" min="-3" max="0" step="0.1" value="-0.8"></div>
+          <div class="field"><label for="gB">Roll B: <span class="val" id="gBv"></span></label><input id="gB" type="range" min="-3" max="0" step="0.1" value="-1.2"></div>
+          <div></div>
+        </div>
+        <div class="row" style="align-items:flex-start;gap:18px">
+          <svg id="grp" viewBox="0 0 250 236" width="250" height="236" role="img" aria-label="Two panels from rolls with different shrinkage"></svg>
+          <div class="readout" id="grpRead"></div>
+        </div>
+      </div>
+      <div class="card">
+        <h3>What testing costs for SS27 (fabric only)</h3>
+        <div class="grid2">
+          <div class="field"><label for="cBuy">Total buy (yds)</label><input id="cBuy" type="number" value="12344073"></div>
+          <div class="field"><label for="cRoll">Average roll (yds)</label><input id="cRoll" type="number" value="60"></div>
+          <div class="field"><label for="cPct">Rolls tested today (%)</label><input id="cPct" type="number" value="10"></div>
+          <div class="field"><label for="cPrice">Fabric cost per yd ($)</label><input id="cPrice" type="number" value="3" step="0.1"></div>
+        </div>
+        <div class="field"><label for="cShare">Batches ShrinkX could clear without a test: <span class="val" id="cShareV"></span></label><input id="cShare" type="range" min="0" max="100" step="5" value="70"></div>
+        <div class="tiles" id="costTiles"></div>
+        <p class="small">Stickers, paperwork, storage and labour are still "TBV" in Sheet1, so the true saving is higher than this.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 2 VARIATION -->
+  <section class="step" id="s-variation">
+    <div class="col story">
+      <h2>Every test result wobbles in two different ways</h2>
+      <p>Each dot on the right is one real batch test. Two things push a dot away from the fabric's true shrinkage.</p>
+      <p><b>Test noise</b> (<span class="term" tabindex="0" data-tip="Sigma. The typical size of random scatter between two tests of the same thing.">σ</span>): two batches of the same colour rarely give identical numbers, even when the fabric is identical. Look at how far dots stray inside one lane.</p>
+      <p><b>Colour drift</b> (<span class="term" tabindex="0" data-tip="Tau. How far the true shrinkage of different colours of the same fabric drifts apart, for example from dyeing.">τ</span>): the dye route changes how fabric relaxes, so the true average differs slightly from colour to colour. Look at how far the lane averages sit from each other.</p>
+      <div class="analogy"><b>Think of it like this.</b> Weigh yourself on a bathroom scale five times and the readings wiggle: that is test noise. Compare the average weight of five different people: that is real difference. ShrinkX keeps the two apart because only one of them goes away when you repeat a test.</div>
+      <div class="oneline">σ tells the model how much to trust a single test. τ tells it how much one colour can differ from the rest.</div>
+      <div class="try"><b>Try this</b><ul>
+        <li>Drag a dot sideways. σ changes first, because that dot now strays further from its lane.</li>
+        <li>Click an empty lane to add a test, and double-click a dot to remove it.</li>
+        <li>Switch the view to "Between colours" and drag a whole lane's dots to see τ move.</li>
+      </ul></div>
+      <details class="math" open><summary>The maths, with live numbers</summary><div class="eq" id="eqVar"></div></details>
+    </div>
+    <div class="col">
+      <div class="card">
+        <div class="row" style="justify-content:space-between">
+          <h3>Batch tests by colour</h3>
+          <div class="seg" role="group" aria-label="View"><button id="vWithin" aria-pressed="true">Within a colour (σ)</button><button id="vBetween" aria-pressed="false">Between colours (τ)</button></div>
+        </div>
+        <div class="legend">
+          <span><i class="dot" style="background:var(--data)"></i>one batch test</span>
+          <span><i class="sw" style="background:var(--ink);width:3px;height:12px"></i>colour average</span>
+          <span id="legWithin"><i class="sw" style="background:var(--accent-soft);border:1px solid var(--accent)"></i>±σ around each average</span>
+          <span id="legBetween" hidden><i class="sw" style="background:var(--accent-soft);border:1px solid var(--accent)"></i>±τ around the fabric average</span>
+        </div>
+        <canvas id="cvStrip" tabindex="0" aria-label="Strip chart of batch tests by colour. Drag dots to change them."></canvas>
+        <p class="small">Drag a dot · click a lane to add one · double-click a dot to remove it. The x axis is shrinkage %, where more negative means a bigger shrink.</p>
+        <div class="tiles" id="varTiles"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3 BASELINE -->
+  <section class="step" id="s-baseline">
+    <div class="col story">
+      <h2>First, a baseline for the whole fabric</h2>
+      <p>One IM is one fabric specification, and all its colours share the same knit, yarn and spandex. So the model first forms a belief about the fabric as a whole.</p>
+      <p>With no data at all, it starts from a vague <span class="term" tabindex="0" data-tip="What we believed before looking at the new tests.">prior</span>. In production this comes from tested IMs with a similar construction, spandex %, gauge and GSM. Here the default is "about −1% give or take 0.6". Each colour's average is then added as evidence.</p>
+      <p>Both sides are blended in proportion to how certain they are. The measure of certainty is <span class="term" tabindex="0" data-tip="Precision is 1 divided by variance. The tighter a belief, the larger its precision and the harder it pulls in the blend.">precision</span>. A vague guess has low precision, so a handful of results quickly outweighs it.</p>
+      <div class="analogy"><b>A tug of war.</b> Two teams pull on a rope. The knot ends up closer to the team that pulls harder, and pulling power here is certainty. The prior starts strong only if you set its spread narrow.</div>
+      <div class="oneline">More evidence and a vaguer prior mean the baseline follows the data. A confident prior resists it.</div>
+      <div class="try"><b>Try this</b><ul>
+        <li>Drag "Colours included" from 8 down to 0 and watch the blue result slide back to the prior.</li>
+        <li>Set the prior spread to 0.10, a very confident prior, and see the data lose the tug of war.</li>
+        <li>Move the prior mean to −0.4 and note that eight colours still pull it back to about −1.0.</li>
+      </ul></div>
+      <details class="math" open><summary>The maths, with live numbers</summary><div class="eq" id="eqBase"></div></details>
+    </div>
+    <div class="col">
+      <div class="card">
+        <h3>Prior against evidence, and what the model believes after mixing them</h3>
+        <div class="legend">
+          <span><i class="sw" style="background:var(--im)"></i>Prior guess</span>
+          <span><i class="sw" style="background:var(--data)"></i>Evidence (average of colour averages)</span>
+          <span><i class="sw" style="background:var(--accent)"></i>Result for the IM</span>
+        </div>
+        <canvas id="cvBase" aria-label="Prior, evidence and posterior curves"></canvas>
+        <p class="small">Curves are drawn at equal height so you can compare their width. Narrower means more certain. Dots under the axis are colour averages, orange when included.</p>
+        <div class="bar" id="barBase"></div>
+        <div class="grid3">
+          <div class="field"><label for="pmu">Prior mean: <span class="val" id="pmuV"></span></label><input id="pmu" type="range" min="-2" max="0" step="0.05" value="-1"></div>
+          <div class="field"><label for="psd">Prior spread: <span class="val" id="psdV"></span></label><input id="psd" type="range" min="0.05" max="1.5" step="0.05" value="0.6"></div>
+          <div class="field"><label for="kIn">Colours included: <span class="val" id="kInV"></span></label><input id="kIn" type="range" min="0" max="8" step="1" value="8"></div>
+        </div>
+        <div class="tiles" id="baseTiles"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 4 COLOUR -->
+  <section class="step" id="s-colour">
+    <div class="col story">
+      <h2>Now zoom in on one colour</h2>
+      <p>A colour starts from the IM result, with extra uncertainty added because colours drift by τ. Then its own tests pull it toward what that colour actually did.</p>
+      <p>Pick a colour in the bar above. With one test, the model barely moves from the IM result. With many tests, the colour's own history takes over. This protects against trusting one odd result.</p>
+      <div class="analogy"><b>A new hire's first review.</b> One good review doesn't make someone a star, because the team average still carries weight. After a year of reviews, their own record decides.</div>
+      <div class="oneline">The coloured bar shows exactly how the weighting splits between "what the IM tells us" and "what this colour's tests tell us".</div>
+      <div class="try"><b>Try this</b><ul>
+        <li>Choose 44B (one test) and click the chart to add tests. Watch its own share grow.</li>
+        <li>Choose BLACK (nine tests) and add a wild −0.4 reading. It barely moves the result.</li>
+        <li>Raise "How noisy is one test" to see why noisy tests earn less trust.</li>
+      </ul></div>
+      <details class="math" open><summary>The maths, with live numbers</summary><div class="eq" id="eqCol"></div></details>
+    </div>
+    <div class="col">
+      <div class="card">
+        <h3>Colour <span id="colName"></span>: IM result against its own tests</h3>
+        <div class="legend">
+          <span><i class="sw" style="background:var(--im)"></i>IM result, widened by τ</span>
+          <span><i class="sw" style="background:var(--data)"></i>This colour's tests</span>
+          <span><i class="sw" style="background:var(--accent)"></i>Result for this colour</span>
+        </div>
+        <canvas id="cvCol" tabindex="0" aria-label="Colour curves. Click to add a test."></canvas>
+        <div class="bar" id="barCol"></div>
+        <div class="tests" id="tests"></div>
+        <div class="row">
+          <span class="small">Click the chart to add a test at that value, or type one:</span>
+          <input id="newTest" type="number" step="0.1" value="-1.0" style="width:90px" aria-label="New test value">
+          <button class="btn" id="addTest">Add</button>
+          <button class="btn ghost" id="resetCol">Restore SAP tests</button>
+        </div>
+        <div class="field"><label for="sigScale">How noisy is one test? <span class="val" id="sigScaleV"></span></label><input id="sigScale" type="range" min="0.5" max="4" step="0.1" value="1"></div>
+        <div class="tiles" id="colTiles"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 5 PREDICT -->
+  <section class="step" id="s-predict">
+    <div class="col story">
+      <h2>The prediction is a range, not a single number</h2>
+      <p>For the next batch of this colour the model gives a best guess and a spread. The spread has three ingredients: what is still unknown about the colour, the noise of a single test, and the fact that the test only reads in 0.1% steps.</p>
+      <p>The 90% range means: if the model is right, nine out of ten future batches land inside it. You can check that claim yourself below by drawing imaginary batches and counting.</p>
+      <p><b>Stage 2, the batch correction.</b> When a batch arrives with a different CPI or WPI from spec, the best guess is shifted by <span class="val">b × deviation</span>. Your data has no CPI yet and GSM and width showed no effect, so b is 0 until real CPI/WPI arrive.</p>
+      <div class="oneline">A probability model is honest about what it doesn't know. The range is the output, not a side note.</div>
+      <div class="try"><b>Try this</b><ul>
+        <li>Press "Draw 500 batches". The bars should hug the curve, and about 90% should land inside the shaded range.</li>
+        <li>Set b to −0.05 and slide the CPI deviation to +4%. The whole curve slides left.</li>
+        <li>Go back a step and add tests. The curve gets narrower, but never narrower than test noise allows.</li>
+      </ul></div>
+      <details class="math" open><summary>The maths, with live numbers</summary><div class="eq" id="eqPred"></div></details>
+    </div>
+    <div class="col">
+      <div class="card">
+        <h3>Imagine the next batch of <span id="predCol"></span> thousands of times</h3>
+        <div class="legend">
+          <span><i class="sw" style="background:var(--accent)"></i>Model's probability curve</span>
+          <span><i class="sw" style="background:var(--data-soft);border:1px solid var(--data)"></i>Simulated batches</span>
+          <span><i class="sw" style="background:var(--accent-soft);border:1px solid var(--accent)"></i>90% range</span>
+        </div>
+        <canvas id="cvPred" aria-label="Predictive distribution with simulated batches"></canvas>
+        <div class="row">
+          <button class="btn" id="draw1">Draw 1 batch</button>
+          <button class="btn" id="draw25">Draw 25</button>
+          <button class="btn" id="draw500">Draw 500 batches</button>
+          <button class="btn ghost" id="clearSim">Clear</button>
+        </div>
+        <div class="callout" id="simRead">Press a draw button to simulate batches from the model's curve.</div>
+        <div class="bar" id="barVar"></div>
+        <p class="small">The coloured bar shows where the uncertainty comes from: colour still unknown, test noise, or rounding of the reading.</p>
+        <div class="grid2">
+          <div class="field"><label for="dev">Batch CPI deviation from spec: <span class="val" id="devV"></span></label><input id="dev" type="range" min="-6" max="6" step="0.5" value="0"></div>
+          <div class="field"><label for="coef">Coefficient b (% shrinkage per 1% CPI)</label><input id="coef" type="number" step="0.01" value="0"></div>
+        </div>
+        <div class="tiles" id="predTiles"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 6 DECIDE -->
+  <section class="step" id="s-decide">
+    <div class="col story">
+      <h2>Turn the range into a decision</h2>
+      <p>Two questions decide what happens to a batch. <b>Could it be out of spec?</b> That is the shaded area beyond your limits. <b>Will it land in the shrinkage group we expect?</b> That is the area inside the group band around the prediction.</p>
+      <p>Both are areas under the bell curve, found with <span class="term" tabindex="0" data-tip="Phi. The share of a standard bell curve that lies to the left of a point.">Φ</span>. If both look safe the batch is LOW risk and can skip the panel test. If one is borderline it is MEDIUM and one roll gets tested. Otherwise it is HIGH and gets the usual testing.</p>
+      <div class="analogy"><b>A weather forecast.</b> "20% chance of rain" lets you decide on an umbrella. The model gives you the chance of a problem and you decide how much of that chance you will accept.</div>
+      <div class="oneline">Spec limits and the group band are yours to set. They are example values here until you enter the buyer's real standard.</div>
+      <div class="try"><b>Try this</b><ul>
+        <li>Drag the red limit lines on the chart toward the curve and watch the risk class change.</li>
+        <li>Read "How many more tests to reach LOW". Some limits can never be reached because test noise alone is too wide.</li>
+        <li>Switch to Width to see that its higher noise makes LOW harder to reach.</li>
+      </ul></div>
+      <details class="math" open><summary>The maths, with live numbers</summary><div class="eq" id="eqDec"></div></details>
+    </div>
+    <div class="col">
+      <div class="card">
+        <h3>Where do the spec limits fall on the prediction?</h3>
+        <div class="legend">
+          <span><i class="sw" style="background:var(--bad-soft);border:1px solid var(--bad)"></i>Out of spec</span>
+          <span><i class="sw" style="background:var(--accent-soft);border:1px solid var(--accent)"></i>Same shrinkage group (±band)</span>
+        </div>
+        <canvas id="cvDec" tabindex="0" aria-label="Prediction with draggable spec limits"></canvas>
+        <p class="small">Drag the red lines. They snap to 0.05%.</p>
+        <div class="grid3">
+          <div class="field"><label for="lsl">Lower spec %</label><input id="lsl" type="number" step="0.05" value="-1.5"></div>
+          <div class="field"><label for="usl">Upper spec %</label><input id="usl" type="number" step="0.05" value="0.5"></div>
+          <div class="field"><label for="band">Group band ± %</label><input id="band" type="number" step="0.05" min="0.05" value="0.5"></div>
+        </div>
+        <div class="tiles" id="decTiles"></div>
+        <div class="callout" id="decRead"></div>
+        <table class="small" id="decRules" style="border-collapse:collapse;width:100%"></table>
+      </div>
+    </div>
+  </section>
+
+  <!-- 7 REPLAY -->
+  <section class="step" id="s-replay">
+    <div class="col story">
+      <h2>Watch it learn from your real SAP history</h2>
+      <p>This replays the actual batches in the order they were inspected. For each one, the model sees only what happened before it, makes a prediction, and is then compared with the real result.</p>
+      <p>The first batches are HIGH because the model knows nothing yet. As results arrive, the ranges tighten and more batches turn LOW. That is the learning curve the real system would follow.</p>
+      <div class="oneline">A good model has a hit rate near 90% for its 90% range, and it beats a plain average.</div>
+      <div class="try"><b>Try this</b><ul>
+        <li>Press play and watch the first bands shrink as evidence builds.</li>
+        <li>Click any batch on the chart to jump to it and read what the model knew at that moment.</li>
+        <li>Change the spec limits in the Decision step, then come back to see the risk strip change.</li>
+      </ul></div>
+      <div class="callout warn">The replay uses the original SAP values, not your edits from earlier steps. One +1.1% length reading is excluded as a likely sign error.</div>
+      <details class="math" open><summary>How the scores are worked out</summary><div class="eq" id="eqRep"></div></details>
+    </div>
+    <div class="col">
+      <div class="card">
+        <div class="row" style="justify-content:space-between">
+          <h3>Prediction against reality, batch by batch</h3>
+          <div class="row">
+            <button class="btn ghost" id="rpReset" aria-label="Back to start">⏮</button>
+            <button class="btn ghost" id="rpBack" aria-label="Previous batch">◀</button>
+            <button class="btn" id="rpPlay">Play</button>
+            <button class="btn ghost" id="rpNext" aria-label="Next batch">▶</button>
+            <select id="rpSpeed" aria-label="Speed" style="width:auto"><option value="900">Slow</option><option value="450" selected>Normal</option><option value="180">Fast</option></select>
+          </div>
+        </div>
+        <div class="legend">
+          <span><i class="sw" style="background:var(--accent-soft);border:1px solid var(--accent)"></i>Model's 90% range before the test</span>
+          <span><i class="dot" style="background:var(--good)"></i>Actual inside</span>
+          <span><i class="dot" style="background:var(--bad)"></i>Actual outside</span>
+          <span><i class="sw" style="background:var(--good)"></i>LOW</span><span><i class="sw" style="background:var(--warn)"></i>MEDIUM</span><span><i class="sw" style="background:var(--bad)"></i>HIGH</span>
+        </div>
+        <canvas id="cvRep" aria-label="Replay of predictions against actual results"></canvas>
+        <input id="rpScrub" type="range" min="0" max="25" step="1" value="0" aria-label="Scrub through batches">
+        <div class="callout" id="rpNow"></div>
+        <div class="tiles" id="rpTiles"></div>
+      </div>
+    </div>
+  </section>
+
+  <div class="pager">
+    <button class="btn ghost" id="back">Back</button>
+    <span class="small" id="pageInfo"></span>
+    <button class="btn" id="next">Next</button>
+  </div>
+  <p class="foot">Same maths as <span style="font-family:var(--mono)">shrinkx_bayes.py</span>. Risk rule: LOW if P(out of spec) is 2% or less and P(same group) is 80% or more; MEDIUM if P(out of spec) is 10% or less; otherwise HIGH. Spec limits and group band are placeholders until the real standard is entered.</p>
+</div>
+
+<script>
+/*** data ***/
+const SAP = {
+  L:{BLACK:[-1.2,-0.8,-0.8,-1.0,-1.05,-1.0,-1.08,-1.08,-0.94],"D GREY":[-0.8,-1.0,-1.1,-1.0],GAMERL:[-1.0,-1.0,-1.0,-1.0],LSRCRM:[-1.0],MNNAVY:[-0.8],UNVRED:[-1.0,-1.0,-1.0],WHITE:[-1.2,-1.1],WORKBL:[-1.2]},
+  W:{BLACK:[-1.3,-1.0,-1.1,-1.1,-1.17,-1.1,-1.18,-1.18,-0.57],"D GREY":[-1.0,-1.2,-0.5],GAMERL:[-1.3,-1.1,-1.1,-1.1],LSRCRM:[-1.2],MNNAVY:[-1.1],UNVRED:[-1.1,-1.1,-1.2,-1.2],WHITE:[-1.1,-0.5],WORKBL:[-1.0]}
+};
+const CODES = {BLACK:"00A",GAMERL:"4EV","D GREY":"00C",WORKBL:"4LA",WHITE:"10A",LSRCRM:"68U",UNVRED:"65N",MNNAVY:"44B"};
+const REPLAY = {"L": [["2026-01-22", "GAMERL", -1.0, "120706554"], ["2026-03-05", "BLACK", -1.2, "122733745"], ["2026-03-27", "GAMERL", -1.0, "123853202"], ["2026-03-30", "D GREY", -0.8, "123926241"], ["2026-04-10", "WHITE", -1.2, "124536115"], ["2026-04-10", "WORKBL", -1.2, "124597787"], ["2026-06-23", "BLACK", -0.8, "124489651"], ["2026-07-08", "GAMERL", -1.0, "123853156"], ["2026-07-27", "GAMERL", -1.0, "123852966"], ["2026-10-02", "BLACK", -0.8, "128508065"], ["2026-10-05", "UNVRED", -1.0, "124386067"], ["2026-10-06", "BLACK", -1.0, "132563009"], ["2026-10-06", "BLACK", -1.05, "132632932"], ["2026-10-09", "D GREY", -1.1, "123926123"], ["2026-10-09", "D GREY", -1.0, "128226730"], ["2026-10-14", "MNNAVY", -0.8, "128226786"], ["2026-10-14", "WHITE", -1.1, "131270526"], ["2026-10-14", "BLACK", -1.0, "133123110"], ["2026-10-21", "LSRCRM", -1.0, "124488328"], ["2026-10-21", "BLACK", -1.08, "133466915"], ["2026-10-23", "BLACK", -1.08, "133565020"], ["2026-10-26", "UNVRED", -1.0, "131008337"], ["2026-10-27", "D GREY", -1.0, "133305931"], ["2026-10-27", "BLACK", -0.94, "133309894"], ["2026-10-30", "UNVRED", -1.0, "132187690"]], "W": [["2026-01-22", "GAMERL", -1.3, "120706554"], ["2026-03-05", "BLACK", -1.3, "122733745"], ["2026-03-27", "GAMERL", -1.1, "123853202"], ["2026-03-30", "D GREY", -1.0, "123926241"], ["2026-04-07", "UNVRED", -1.1, "124386399"], ["2026-04-10", "WHITE", -1.1, "124536115"], ["2026-04-10", "WORKBL", -1.0, "124597787"], ["2026-06-23", "BLACK", -1.0, "124489651"], ["2026-07-08", "GAMERL", -1.1, "123853156"], ["2026-07-27", "GAMERL", -1.1, "123852966"], ["2026-10-02", "BLACK", -1.1, "128508065"], ["2026-10-05", "UNVRED", -1.1, "124386067"], ["2026-10-06", "BLACK", -1.1, "132563009"], ["2026-10-06", "BLACK", -1.17, "132632932"], ["2026-10-09", "D GREY", -1.2, "123926123"], ["2026-10-14", "MNNAVY", -1.1, "128226786"], ["2026-10-14", "WHITE", -0.5, "131270526"], ["2026-10-14", "BLACK", -1.1, "133123110"], ["2026-10-21", "LSRCRM", -1.2, "124488328"], ["2026-10-21", "BLACK", -1.18, "133466915"], ["2026-10-23", "BLACK", -1.18, "133565020"], ["2026-10-26", "UNVRED", -1.2, "131008337"], ["2026-10-27", "D GREY", -0.5, "133305931"], ["2026-10-27", "BLACK", -0.57, "133309894"], ["2026-10-30", "UNVRED", -1.2, "132187690"]]};
+const ROUND_VAR = 0.01/12;
+const STEPS = [
+  {id:"problem",t:"The problem",s:"Why predict"},
+  {id:"variation",t:"Two kinds of wobble",s:"Noise and colours"},
+  {id:"baseline",t:"Fabric baseline",s:"Stage 1 · IM"},
+  {id:"colour",t:"One colour",s:"Stage 1 · colour"},
+  {id:"predict",t:"Next batch",s:"Stage 2 · batch"},
+  {id:"decide",t:"Decision",s:"Risk class"},
+  {id:"replay",t:"Replay history",s:"Back-test"}
+];
+const clone = o => JSON.parse(JSON.stringify(o));
+const DEFAULTS = () => ({dir:"L",colour:"MNNAVY",data:clone(SAP),lsl:-1.5,usl:0.5,band:0.5,pmu:-1.0,psd:0.6,kIn:8,b:0,dev:0,sigScale:1,vmode:"within",sim:{vals:[],last:null,sig:""},rk:0,playing:false});
+let S = Object.assign(DEFAULTS(),{step:"problem",visited:{problem:true}});
+
+/*** helpers ***/
+const $ = id => document.getElementById(id);
+const f = (x,d=3) => Number.isFinite(x) ? x.toFixed(d) : "–";
+const sum = a => a.reduce((s,x)=>s+x,0);
+const mean = a => sum(a)/a.length;
+const varS = a => a.length<2 ? NaN : sum(a.map(x=>(x-mean(a))**2))/(a.length-1);
+const clamp = (x,a,b) => Math.min(b,Math.max(a,x));
+const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const pdf = (x,m,s) => Math.exp(-0.5*((x-m)/s)**2)/(s*Math.sqrt(2*Math.PI));
+const pct = p => p<0.0001 ? "< 0.01 %" : (p*100).toFixed(p<0.01?2:1)+" %";
+function Phi(z){const t=1/(1+0.3275911*Math.abs(z)/Math.SQRT2);const y=1-(((((1.061405429*t-1.453152027)*t)+1.421413741)*t-0.284496736)*t+0.254829592)*t*Math.exp(-z*z/2);return z>=0?(1+y)/2:(1-y)/2;}
+function randn(){let u=0,v=0;while(!u)u=Math.random();while(!v)v=Math.random();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);}
+function niceStep(range){for(const s of [0.02,0.05,0.1,0.25,0.5,1])if(range/s<=9)return s;return 1;}
+function colors(){const g=css;return{ink:g("--ink"),muted:g("--muted"),line:g("--line"),acc:g("--accent"),accS:g("--accent-soft"),im:g("--im"),dat:g("--data"),datS:g("--data-soft"),good:g("--good"),warn:g("--warn"),bad:g("--bad"),badS:g("--bad-soft"),panel:g("--panel"),mono:css("--mono")};}
+function fit(cv){const dpr=window.devicePixelRatio||1,w=cv.clientWidth,h=cv.clientHeight;if(!w||!h)return null;cv.width=Math.round(w*dpr);cv.height=Math.round(h*dpr);const ctx=cv.getContext("2d");ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,w,h);return{ctx,w,h};}
+const P = () => ({mu0:S.pmu,sd0:S.psd,b:S.b,dev:S.dev,lsl:S.lsl,usl:S.usl,h:Math.max(S.band,0.01),sigScale:1});
+
+/*** the model (same maths as shrinkx_bayes.py) ***/
+function model(D,colour,p){
+  const cols=Object.keys(D).filter(c=>D[c].length>0);
+  let ss=0,dof=0;const rows=[];
+  for(const c of cols){const a=D[c];if(a.length>1){const v=varS(a);ss+=v*(a.length-1);dof+=a.length-1;rows.push([c,a.length,v]);}}
+  const sc=p.sigScale||1;
+  const sigma2=((ss+3*0.0625)/(dof+3))*sc*sc;
+  const means=cols.map(c=>mean(D[c]));
+  const nbar=cols.length?mean(cols.map(c=>D[c].length)):1;
+  const vMeans=means.length>1?varS(means):NaN;
+  const tauRaw=Number.isFinite(vMeans)?vMeans-sigma2/nbar:NaN;
+  const tau2=Number.isFinite(tauRaw)?Math.max(tauRaw,0.01):0.01;
+  const mu0=p.mu0,v0=p.sd0*p.sd0,obsVar=tau2+sigma2/nbar;
+  const imAt=k=>{const mu=means.slice(0,k);const prec=1/v0+mu.length/obsVar;return{k:mu.length,sumM:sum(mu),prec,m:(mu0/v0+sum(mu)/obsVar)/prec,v:1/prec};};
+  const im=imAt(means.length);
+  const tests=D[colour]||[];
+  const pm=im.m,pv=im.v+tau2;
+  const precC=1/pv+tests.length/sigma2;
+  const mC=(pm/pv+sum(tests)/sigma2)/precC,vC=1/precC;
+  const wData=(tests.length/sigma2)/precC;
+  const dev=p.dev||0,b=p.b||0;
+  const m=mC+b*dev;
+  const s2=vC+sigma2+ROUND_VAR,s=Math.sqrt(s2);
+  const pLow=Phi((p.lsl-m)/s),pHigh=1-Phi((p.usl-m)/s),pOut=pLow+pHigh,pGrp=2*Phi(p.h/s)-1;
+  const risk=(pOut<=0.02&&pGrp>=0.80)?"LOW":(pOut<=0.10?"MEDIUM":"HIGH");
+  return{cols,rows,ss,dof,sigma2,means,nbar,vMeans,tauRaw,tau2,mu0,v0,obsVar,imAt,im,tests,pm,pv,precC,mC,vC,wData,dev,b,m,s2,s,pLow,pHigh,pOut,pGrp,risk,p};
+}
+const cur = () => model(S.data[S.dir],S.colour,P());
+function testsToLow(r){
+  const p=r.p;
+  for(let k=0;k<=80;k++){
+    const prec=1/r.pv+(r.tests.length+k)/r.sigma2;
+    const s=Math.sqrt(1/prec+r.sigma2+ROUND_VAR);
+    const po=Phi((p.lsl-r.m)/s)+1-Phi((p.usl-r.m)/s),pg=2*Phi(p.h/s)-1;
+    if(po<=0.02&&pg>=0.8)return k;
+  }
+  return null;
+}
+
+/*** step 1: problem ***/
+function drawProblem(){
+  const pl=+$("pL").value,pw=+$("pW").value,mag=+$("pMag").value;
+  $("pLv").textContent=pl.toFixed(1)+" %";$("pWv").textContent=pw.toFixed(1)+" %";
+  const L0=70,W0=52,k=2.7,ox=26,oy=14;
+  const w0=W0*k,h0=L0*k,w1=W0*(1+pw*mag/100)*k,h1=L0*(1+pl*mag/100)*k;
+  $("swatch").innerHTML=
+   `<rect x="${ox}" y="${oy}" width="${w0}" height="${h0}" fill="none" stroke="var(--muted)" stroke-dasharray="5 4"/>
+    <rect x="${ox}" y="${oy}" width="${Math.max(w1,1)}" height="${Math.max(h1,1)}" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="2"/>
+    <text x="${ox+w0/2}" y="${oy+h0+16}" text-anchor="middle">${W0} cm wide</text>
+    <text x="${ox-6}" y="${oy+h0/2}" text-anchor="middle" transform="rotate(-90 ${ox-6} ${oy+h0/2})">${L0} cm long</text>
+    <text x="${ox+w0+4}" y="${oy+12}">← before</text>`;
+  const dl=L0*pl/100*10,dw=W0*pw/100*10;
+  $("swRead").innerHTML=`<div>Length: <b>${L0} cm → ${(L0+dl/10).toFixed(2)} cm</b></div><div>That is <b>${dl.toFixed(1)} mm</b> shorter.</div><div>Width: <b>${W0} cm → ${(W0+dw/10).toFixed(2)} cm</b></div><div>That is <b>${dw.toFixed(1)} mm</b> narrower.</div><div class="small" style="max-width:26ch">The picture is magnified ×${mag}. The millimetres are true.</div>`;
+  const gA=+$("gA").value,gB=+$("gB").value;
+  $("gAv").textContent=gA.toFixed(1)+" %";$("gBv").textContent=gB.toFixed(1)+" %";
+  const hA=L0*(1+gA*mag/100)*k,hB=L0*(1+gB*mag/100)*k;
+  $("grp").innerHTML=
+   `<rect x="30" y="14" width="80" height="${hA}" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="2"/>
+    <rect x="130" y="14" width="80" height="${hB}" fill="var(--data-soft)" stroke="var(--data)" stroke-width="2"/>
+    <line x1="14" x2="226" y1="${14+Math.min(hA,hB)}" y2="${14+Math.min(hA,hB)}" stroke="var(--bad)" stroke-dasharray="4 3"/>
+    <text x="70" y="${14+h0+16}" text-anchor="middle">Roll A</text><text x="170" y="${14+h0+16}" text-anchor="middle">Roll B</text>`;
+  const diff=Math.abs(L0*(gA-gB)/100*10);
+  $("grpRead").innerHTML=`<div>Two panels cut at ${L0} cm.</div><div>After steaming: <b>${(L0*(1+gA/100)).toFixed(2)}</b> and <b>${(L0*(1+gB/100)).toFixed(2)} cm</b>.</div><div>Gap: <b>${diff.toFixed(1)} mm</b></div><div class="small" style="max-width:28ch">If both sit in one garment, that gap shows up as twist or uneven length. Grouping rolls by shrinkage keeps it small.</div>`;
+  const buy=+$("cBuy").value||0,roll=+$("cRoll").value||1,pc=+$("cPct").value||0,price=+$("cPrice").value||0,share=+$("cShare").value;
+  $("cShareV").textContent=share+" %";
+  const rolls=buy/roll,tested=rolls*pc/100,cost=tested*price,saved=cost*share/100;
+  const T=(k,v,u="")=>`<div class="tile"><span class="k">${k}</span><span class="v">${v}<small>${u}</small></span></div>`;
+  $("costTiles").innerHTML=T("Rolls bought",Math.round(rolls).toLocaleString())+T("Panels tested today",Math.round(tested).toLocaleString())+T("Panel fabric cost","$"+Math.round(cost).toLocaleString())+T("Saved at "+share+"%","$"+Math.round(saved).toLocaleString());
+}
+
+/*** step 2: variation (strip plot) ***/
+const STRIP={pad:{l:112,r:18,t:30,b:30},xr:[-1.7,-0.2],hit:[],drag:null};
+const sX=(v,w)=>STRIP.pad.l+(v-STRIP.xr[0])/(STRIP.xr[1]-STRIP.xr[0])*(w-STRIP.pad.l-STRIP.pad.r);
+const sV=(px,w)=>STRIP.xr[0]+(px-STRIP.pad.l)/(w-STRIP.pad.l-STRIP.pad.r)*(STRIP.xr[1]-STRIP.xr[0]);
+function drawStrip(r){
+  const g=fit($("cvStrip"));if(!g)return;const{ctx,w,h}=g,c=colors(),p=STRIP.pad;
+  const D=S.data[S.dir],names=Object.keys(D),laneH=(h-p.t-p.b)/names.length;
+  STRIP.w=w;STRIP.h=h;STRIP.laneH=laneH;STRIP.names=names;STRIP.hit=[];
+  ctx.font="11.5px "+c.mono;
+  names.forEach((n,i)=>{if(i%2==0){ctx.fillStyle=c.line;ctx.globalAlpha=.3;ctx.fillRect(p.l-110,p.t+i*laneH,w-p.r-p.l+110,laneH);ctx.globalAlpha=1;}});
+  ctx.fillStyle=c.muted;ctx.textAlign="center";ctx.strokeStyle=c.line;ctx.lineWidth=1;
+  for(let v=-1.7;v<=-0.19;v+=0.1){const x=sX(v,w);ctx.beginPath();ctx.moveTo(x,p.t);ctx.lineTo(x,h-p.b);ctx.stroke();ctx.fillText(v.toFixed(1),x,h-p.b+16);}
+  ctx.fillText("shrinkage %",(p.l+w-p.r)/2,h-3);
+  const between=S.vmode==="between";
+  const imMean=r.means.length?mean(r.means):null;
+  if(between&&imMean!==null){
+    const tau=Math.sqrt(r.tau2);
+    ctx.fillStyle=c.accS;ctx.fillRect(sX(imMean-tau,w),p.t,sX(imMean+tau,w)-sX(imMean-tau,w),h-p.t-p.b);
+    ctx.strokeStyle=c.acc;ctx.setLineDash([5,4]);ctx.beginPath();ctx.moveTo(sX(imMean,w),p.t);ctx.lineTo(sX(imMean,w),h-p.b);ctx.stroke();ctx.setLineDash([]);
+    ctx.fillStyle=c.acc;ctx.textAlign="center";ctx.font="600 11.5px "+c.mono;ctx.fillText("fabric average "+imMean.toFixed(2)+"  ±τ "+tau.toFixed(2),sX(imMean,w),p.t-10);
+  }
+  names.forEach((n,i)=>{
+    const a=D[n],cy=p.t+i*laneH+laneH/2;
+    ctx.font="12px "+c.mono;ctx.textAlign="right";ctx.fillStyle=c.ink;ctx.fillText(n,p.l-26,cy+1);ctx.fillStyle=c.muted;ctx.font="11px "+c.mono;ctx.fillText(CODES[n]+" · n="+a.length,p.l-26,cy+14);
+    if(a.length){
+      const m=mean(a);
+      if(!between){const sg=Math.sqrt(r.sigma2);ctx.fillStyle=c.accS;ctx.fillRect(sX(m-sg,w),cy-10,sX(m+sg,w)-sX(m-sg,w),20);ctx.strokeStyle=c.acc;ctx.lineWidth=1;ctx.strokeRect(sX(m-sg,w)+.5,cy-10,sX(m+sg,w)-sX(m-sg,w),20);}
+      ctx.fillStyle=c.ink;
+      if(between){ctx.beginPath();ctx.moveTo(sX(m,w),cy-9);ctx.lineTo(sX(m,w)+7,cy);ctx.lineTo(sX(m,w),cy+9);ctx.lineTo(sX(m,w)-7,cy);ctx.closePath();ctx.fill();}
+      else ctx.fillRect(sX(m,w)-1.5,cy-12,3,24);
+    }
+    a.forEach((v,j)=>{
+      let k=0;for(let q=0;q<j;q++)if(Math.abs(a[q]-v)<0.03)k++;
+      const y=cy+(k%2?1:-1)*Math.ceil(k/2)*6,x=sX(v,w);
+      STRIP.hit.push({c:n,i:j,x,y});
+      ctx.fillStyle=c.dat;ctx.globalAlpha=between?.55:.95;ctx.beginPath();ctx.arc(x,y,5.5,0,7);ctx.fill();ctx.globalAlpha=1;
+      ctx.strokeStyle=c.panel;ctx.lineWidth=1.2;ctx.stroke();
+    });
+  });
+  if(!between){ctx.fillStyle=c.acc;ctx.textAlign="left";ctx.font="600 11.5px "+c.mono;ctx.fillText("each band is ±σ = "+Math.sqrt(r.sigma2).toFixed(2)+" around that colour's own average",p.l,p.t-10);}
+}
+function stripPointer(e,type){
+  const cv=$("cvStrip"),rc=cv.getBoundingClientRect(),px=e.clientX-rc.left,py=e.clientY-rc.top,p=STRIP.pad,D=S.data[S.dir];
+  if(type==="down"){
+    let best=null,bd=12;STRIP.hit.forEach(o=>{const d=Math.hypot(o.x-px,o.y-py);if(d<bd){bd=d;best=o;}});
+    if(best){STRIP.drag={c:best.c,i:best.i};}
+    else{const li=Math.floor((py-p.t)/STRIP.laneH);if(li>=0&&li<STRIP.names.length&&px>p.l-4){const n=STRIP.names[li];D[n].push(clamp(Math.round(sV(px,STRIP.w)*10)/10,-1.7,-0.2));STRIP.drag={c:n,i:D[n].length-1};}}
+    if(STRIP.drag){cv.setPointerCapture(e.pointerId);cv.style.cursor="grabbing";refresh();}
+  }else if(type==="move"&&STRIP.drag){
+    D[STRIP.drag.c][STRIP.drag.i]=clamp(Math.round(sV(px,STRIP.w)*100)/100,-1.7,-0.2);refresh();
+  }else if(type==="up"){STRIP.drag=null;cv.style.cursor="grab";}
+}
+
+/*** tug of war drawing (steps 3 and 4) ***/
+const TUG={xr:[-2.4,0.4],pad:{l:16,r:16,t:58,b:58}};
+function drawTug(cv,o){
+  const g=fit(cv);if(!g)return;const{ctx,w,h}=g,c=colors(),p=TUG.pad,xr=TUG.xr;
+  const X=v=>p.l+(v-xr[0])/(xr[1]-xr[0])*(w-p.l-p.r),base=h-p.b,top=p.t;
+  const Y=y=>base-y*(base-top);
+  cv._map={w,xr,p};
+  ctx.font="11.5px "+c.mono;ctx.fillStyle=c.muted;ctx.strokeStyle=c.line;ctx.textAlign="center";
+  for(let v=-2.4;v<=0.41;v+=0.4){ctx.beginPath();ctx.moveTo(X(v),top);ctx.lineTo(X(v),base);ctx.stroke();ctx.fillText(v.toFixed(1),X(v),base+14);}
+  ctx.fillText("shrinkage %",(p.l+w-p.r)/2,h-4);
+  const curve=(m,s,col,fill,dash,lw)=>{
+    ctx.beginPath();ctx.moveTo(X(xr[0]),base);
+    for(let i=0;i<=320;i++){const x=xr[0]+(xr[1]-xr[0])*i/320;ctx.lineTo(X(x),Y(Math.exp(-0.5*((x-m)/s)**2)));}
+    ctx.lineTo(X(xr[1]),base);ctx.closePath();
+    if(fill){ctx.fillStyle=fill;ctx.fill();}
+    ctx.setLineDash(dash||[]);ctx.strokeStyle=col;ctx.lineWidth=lw;ctx.stroke();ctx.setLineDash([]);
+  };
+  curve(o.prior.m,o.prior.s,c.im,null,[6,4],1.8);
+  if(o.ev)curve(o.ev.m,o.ev.s,c.dat,c.datS,null,2);
+  curve(o.post.m,o.post.s,c.acc,c.accS,null,2.8);
+  const labs=[[o.prior,"prior",c.im],o.ev?[o.ev,"evidence",c.dat]:null,[o.post,"result",c.acc]].filter(Boolean);
+  ctx.font="600 11.5px "+c.mono;
+  labs.forEach(([q,name,col],i)=>{
+    const x=X(q.m),ty=14+i*14;
+    ctx.strokeStyle=col;ctx.lineWidth=1;ctx.setLineDash([2,3]);ctx.beginPath();ctx.moveTo(x,ty+3);ctx.lineTo(x,Y(1));ctx.stroke();ctx.setLineDash([]);
+    ctx.fillStyle=col;ctx.textAlign="center";const tx=clamp(x,p.l+80,w-p.r-80);ctx.fillText(name+" "+q.m.toFixed(2)+" ± "+q.s.toFixed(2),tx,ty);
+  });
+  (o.markers||[]).forEach(mk=>{
+    ctx.beginPath();ctx.arc(X(mk.v),base+34,5,0,7);
+    if(mk.on){ctx.fillStyle=c.dat;ctx.fill();}else{ctx.strokeStyle=c.muted;ctx.lineWidth=1.5;ctx.stroke();}
+  });
+}
+
+/*** step 3: baseline ***/
+function renderBaseline(r){
+  S.kIn=Math.min(S.kIn,Math.max(r.means.length,0));
+  $("kIn").max=r.means.length;$("kIn").value=S.kIn;
+  $("pmu").value=S.pmu;$("psd").value=S.psd;
+  $("pmuV").textContent=S.pmu.toFixed(2)+" %";$("psdV").textContent="± "+S.psd.toFixed(2);$("kInV").textContent=S.kIn+" of "+r.means.length;
+  const im=r.imAt(S.kIn),ev=S.kIn?{m:mean(r.means.slice(0,S.kIn)),s:Math.sqrt(r.obsVar/S.kIn)}:null;
+  drawTug($("cvBase"),{prior:{m:r.mu0,s:Math.sqrt(r.v0)},ev,post:{m:im.m,s:Math.sqrt(im.v)},markers:r.means.map((v,i)=>({v,on:i<S.kIn}))});
+  const wp=(1/r.v0)/im.prec*100;
+  $("barBase").innerHTML=`<div style="flex-basis:${wp}%;background:var(--im)">${wp>=10?wp.toFixed(0)+"% prior":""}</div><div style="flex-basis:${100-wp}%;background:var(--data)">${100-wp>=10?(100-wp).toFixed(0)+"% evidence":""}</div>`;
+  $("baseTiles").innerHTML=T("IM result",f(im.m,3),"%")+T("Certainty ±",f(Math.sqrt(im.v),3),"%")+T("Weight of evidence",f(100-wp,0),"%");
+  const sm=r.means.slice(0,S.kIn);
+  $("eqBase").innerHTML=
+`prior            μ₀ = ${f(r.mu0,2)}   v₀ = ${f(r.v0,4)}   (spread ${f(Math.sqrt(r.v0),2)})
+each colour average is an observation with variance
+                 τ² + σ²/n̄ = ${f(r.tau2,4)} + ${f(r.sigma2,5)}/${f(r.nbar,2)} = ${f(r.obsVar,5)}
+colour averages included: ${S.kIn}   (sum = ${f(sum(sm),4)})
+
+precision = 1/v₀ + k/obs var
+          = ${f(1/r.v0,2)} + ${S.kIn}/${f(r.obsVar,5)} = ${f(im.prec,2)}
+
+μ_IM = ( μ₀/v₀ + Σavg/obs var ) / precision
+     = ( ${f(r.mu0,2)}/${f(r.v0,4)} + ${f(sum(sm),4)}/${f(r.obsVar,5)} ) / ${f(im.prec,2)}
+     = <b>${f(im.m,3)} %</b>
+
+v_IM = 1 / precision = ${f(im.v,5)}      certainty ± <b>${f(Math.sqrt(im.v),3)} %</b>
+
+weights: prior <b>${f(wp,1)}%</b>, evidence <b>${f(100-wp,1)}%</b>`;
+}
+const T=(k,v,u="")=>`<div class="tile"><span class="k">${k}</span><span class="v">${v}<small> ${u}</small></span></div>`;
+
+/*** step 4: colour ***/
+function renderColour(r){
+  $("colName").textContent=S.colour+" ("+CODES[S.colour]+")";
+  $("sigScale").value=S.sigScale;$("sigScaleV").textContent=S.sigScale===1?"as measured":"×"+S.sigScale.toFixed(1)+" what-if";
+  const rr=model(S.data[S.dir],S.colour,{...P(),sigScale:S.sigScale});
+  const n=rr.tests.length;
+  const ev=n?{m:mean(rr.tests),s:Math.sqrt(rr.sigma2/n)}:null;
+  drawTug($("cvCol"),{prior:{m:rr.pm,s:Math.sqrt(rr.pv)},ev,post:{m:rr.mC,s:Math.sqrt(rr.vC)},markers:rr.tests.map(v=>({v,on:true}))});
+  const wd=rr.wData*100;
+  $("barCol").innerHTML=`<div style="flex-basis:${100-wd}%;background:var(--im)">${100-wd>=10?(100-wd).toFixed(0)+"% IM history":""}</div><div style="flex-basis:${wd}%;background:var(--data)">${wd>=10?wd.toFixed(0)+"% own tests":""}</div>`;
+  $("tests").innerHTML=n?rr.tests.map((v,i)=>`<span class="test">${v.toFixed(2)}<button aria-label="Remove test ${v}" data-i="${i}">×</button></span>`).join(""):`<span class="small">No tests yet, so this colour simply uses the IM result.</span>`;
+  $("colTiles").innerHTML=T("Colour result",f(rr.mC,3),"%")+T("Certainty ±",f(Math.sqrt(rr.vC),3),"%")+T("Own tests weigh",f(wd,0),"%");
+  const ts=sum(rr.tests);
+  $("eqCol").innerHTML=
+`prior   mean = μ_IM = ${f(rr.pm,3)}
+        var  = v_IM + τ² = ${f(rr.im.v,5)} + ${f(rr.tau2,4)} = ${f(rr.pv,5)}
+tests   <i>${n?rr.tests.map(x=>x.toFixed(2)).join(", "):"none"}</i>   (n = ${n}, Σ = ${f(ts,2)})
+noise   σ² = ${f(rr.sigma2,5)}${S.sigScale!==1?"   (what-if ×"+S.sigScale.toFixed(1)+")":""}
+
+precision = 1/${f(rr.pv,5)} + ${n}/${f(rr.sigma2,5)}
+          = ${f(1/rr.pv,2)} + ${f(n/rr.sigma2,2)} = ${f(rr.precC,2)}
+
+μ_col = ( ${f(rr.pm,3)}×${f(1/rr.pv,2)} + ${f(ts,2)}×${f(1/rr.sigma2,2)} ) / ${f(rr.precC,2)}
+      = <b>${f(rr.mC,3)} %</b>      v_col = ${f(rr.vC,5)}
+
+weights: IM history <b>${f(100-wd,1)}%</b>, own tests <b>${f(wd,1)}%</b>`;
+}
+
+/*** step 5: predict ***/
+function drawPredict(r){
+  const g=fit($("cvPred"));if(!g)return;const{ctx,w,h}=g,c=colors(),pad={l:20,r:16,t:36,b:44};
+  const half=Math.max(4.2*r.s,0.5),x0=r.m-half,x1=r.m+half,nb=50,bw=(x1-x0)/nb;
+  const sim=S.sim.vals,N=sim.length,counts=new Array(nb).fill(0);
+  sim.forEach(v=>{const k=Math.floor((v-x0)/bw);if(k>=0&&k<nb)counts[k]++;});
+  const dens=counts.map(k=>N?k/(N*bw):0),peak=pdf(r.m,r.m,r.s),ymax=Math.max(peak,...dens)*1.12;
+  const X=v=>pad.l+(v-x0)/(x1-x0)*(w-pad.l-pad.r),base=h-pad.b,Y=y=>base-y/ymax*(base-pad.t);
+  const lo=r.m-1.645*r.s,hi=r.m+1.645*r.s;
+  ctx.fillStyle=c.accS;ctx.fillRect(X(lo),pad.t,X(hi)-X(lo),base-pad.t);
+  ctx.font="11.5px "+c.mono;ctx.textAlign="center";ctx.strokeStyle=c.line;ctx.fillStyle=c.muted;ctx.lineWidth=1;
+  const st=niceStep(x1-x0);for(let v=Math.ceil(x0/st)*st;v<=x1+1e-9;v+=st){ctx.beginPath();ctx.moveTo(X(v),pad.t);ctx.lineTo(X(v),base);ctx.stroke();ctx.fillText(v.toFixed(2),X(v),base+14);}
+  ctx.fillText("shrinkage % of the next batch",(pad.l+w-pad.r)/2,h-6);
+  dens.forEach((d,i)=>{if(!d)return;ctx.fillStyle=c.datS;ctx.fillRect(X(x0+i*bw)+1,Y(d),X(x0+(i+1)*bw)-X(x0+i*bw)-2,base-Y(d));ctx.strokeStyle=c.dat;ctx.strokeRect(X(x0+i*bw)+1.5,Y(d),X(x0+(i+1)*bw)-X(x0+i*bw)-3,base-Y(d));});
+  ctx.strokeStyle=c.acc;ctx.lineWidth=2.6;ctx.beginPath();
+  for(let i=0;i<=300;i++){const x=x0+(x1-x0)*i/300;i?ctx.lineTo(X(x),Y(pdf(x,r.m,r.s))):ctx.moveTo(X(x),Y(pdf(x,r.m,r.s)));}ctx.stroke();
+  ctx.fillStyle=c.acc;ctx.font="600 11.5px "+c.mono;ctx.textAlign="center";
+  ctx.fillText("best guess "+r.m.toFixed(2),X(r.m),16);
+  ctx.textAlign="right";ctx.fillText(lo.toFixed(2),X(lo)-4,pad.t+12);ctx.textAlign="left";ctx.fillText(hi.toFixed(2),X(hi)+4,pad.t+12);
+  if(S.sim.last!==null){const x=X(S.sim.last);ctx.strokeStyle=c.dat;ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(x,pad.t+20);ctx.lineTo(x,base);ctx.stroke();ctx.fillStyle=c.dat;ctx.beginPath();ctx.arc(x,base,5,0,7);ctx.fill();ctx.textAlign="center";ctx.fillText("just drawn "+S.sim.last.toFixed(2),clamp(x,70,w-70),pad.t+16);}
+}
+function renderPredict(r){
+  $("predCol").textContent=S.colour+" ("+CODES[S.colour]+")";
+  $("devV").textContent=(S.dev>0?"+":"")+S.dev.toFixed(1)+" %";$("coef").value=S.b;$("dev").value=S.dev;
+  const sig=[S.dir,S.colour,r.m.toFixed(4),r.s.toFixed(4)].join("|");
+  if(sig!==S.sim.sig){S.sim={vals:[],last:null,sig};}
+  drawPredict(r);
+  const N=S.sim.vals.length,lo=r.m-1.645*r.s,hi=r.m+1.645*r.s;
+  if(N){const ins=S.sim.vals.filter(v=>v>=lo&&v<=hi).length,out=S.sim.vals.filter(v=>v<r.p.lsl||v>r.p.usl).length;
+    $("simRead").innerHTML=`<b>${N}</b> simulated batches. <b>${ins}</b> landed inside the 90% range (<b>${(ins/N*100).toFixed(1)}%</b>, the model says 90%). <b>${out}</b> fell outside your spec limits (${(out/N*100).toFixed(1)}%, the model says ${pct(r.pOut)}). The more you draw, the closer the counts match.`;}
+  const parts=[[r.vC,"var(--accent)","colour unknown"],[r.sigma2,"var(--data)","test noise"],[ROUND_VAR,"var(--im)","rounding"]];
+  $("barVar").innerHTML=parts.map(([v,cl,l])=>{const q=v/r.s2*100;return `<div style="flex-basis:${q}%;background:${cl}">${q>=16?l+" "+q.toFixed(0)+"%":""}</div>`}).join("");
+  $("predTiles").innerHTML=T("Best guess",f(r.m,2),"%")+T("90% range",f(lo,2)+" to "+f(hi,2),"")+T("Spread ±",f(r.s,3),"%");
+  $("eqPred").innerHTML=
+`best guess   m = μ_col + b·ΔCPI
+               = ${f(r.mC,3)} + (${f(r.b,2)})×(${f(r.dev,1)})
+               = <b>${f(r.m,3)} %</b>
+
+uncertainty  s² = v_col + σ² + 0.1²/12
+               = ${f(r.vC,5)} + ${f(r.sigma2,5)} + ${f(ROUND_VAR,5)}
+               = ${f(r.s2,5)}      s = <b>${f(r.s,3)} %</b>
+
+90% range    m ± 1.645 × s = ${f(r.m,3)} ± ${f(1.645*r.s,3)}
+               = [<b>${f(lo,2)}</b> , <b>${f(hi,2)}</b>] %
+
+Stage 2:  ΔCPI% = (actual CPI − spec CPI) / spec CPI × 100
+          b is kept only if |b| > 2 × its own uncertainty.
+          Your data: no CPI recorded, GSM and width gave b ≈ 0.`;
+}
+let simTimer=null;
+function drawSim(n){
+  const r=cur();
+  if(simTimer)cancelAnimationFrame(simTimer);
+  let left=n;
+  const step=()=>{
+    const k=Math.min(left,n>100?25:n);
+    for(let i=0;i<k;i++){const v=r.m+r.s*randn();S.sim.vals.push(v);S.sim.last=v;}
+    left-=k;refresh();
+    if(left>0)simTimer=requestAnimationFrame(step);
+  };step();
+}
+
+/*** step 6: decide ***/
+const DEC={pad:{l:20,r:20,t:40,b:44},drag:null};
+function decGeom(r,w){const half=Math.max(4.2*r.s,0.5);const lo=Math.min(r.m-half,r.p.lsl-0.2),hi=Math.max(r.m+half,r.p.usl+0.2);return{x0:lo,x1:hi,X:v=>DEC.pad.l+(v-lo)/(hi-lo)*(w-DEC.pad.l-DEC.pad.r)};}
+function drawDecide(r){
+  const g=fit($("cvDec"));if(!g)return;const{ctx,w,h}=g,c=colors(),p=DEC.pad,{x0,x1,X}=decGeom(r,w),base=h-p.b;
+  DEC.w=w;DEC.geom={x0,x1};
+  const ymax=pdf(r.m,r.m,r.s)*1.12,Y=y=>base-y/ymax*(base-p.t);
+  const area=(a,b,fill)=>{ctx.beginPath();ctx.moveTo(X(a),base);for(let i=0;i<=200;i++){const x=a+(b-a)*i/200;ctx.lineTo(X(x),Y(pdf(x,r.m,r.s)));}ctx.lineTo(X(b),base);ctx.closePath();ctx.fillStyle=fill;ctx.fill();};
+  area(Math.max(r.m-r.p.h,x0),Math.min(r.m+r.p.h,x1),c.accS);
+  area(x0,Math.min(r.p.lsl,x1),c.badS);area(Math.max(r.p.usl,x0),x1,c.badS);
+  ctx.font="11.5px "+c.mono;ctx.textAlign="center";ctx.strokeStyle=c.line;ctx.fillStyle=c.muted;ctx.lineWidth=1;
+  const st=niceStep(x1-x0);for(let v=Math.ceil(x0/st)*st;v<=x1+1e-9;v+=st){ctx.beginPath();ctx.moveTo(X(v),p.t);ctx.lineTo(X(v),base);ctx.stroke();ctx.fillText(v.toFixed(2),X(v),base+14);}
+  ctx.fillText("shrinkage %",(p.l+w-p.r)/2,h-6);
+  ctx.strokeStyle=c.acc;ctx.lineWidth=2.6;ctx.beginPath();
+  for(let i=0;i<=300;i++){const x=x0+(x1-x0)*i/300;i?ctx.lineTo(X(x),Y(pdf(x,r.m,r.s))):ctx.moveTo(X(x),Y(pdf(x,r.m,r.s)));}ctx.stroke();
+  [[r.p.lsl,"lower spec"],[r.p.usl,"upper spec"]].forEach(([v,l],i)=>{
+    const x=X(v);ctx.strokeStyle=c.bad;ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(x,p.t-6);ctx.lineTo(x,base);ctx.stroke();
+    ctx.fillStyle=c.bad;ctx.beginPath();ctx.moveTo(x-7,p.t-6);ctx.lineTo(x+7,p.t-6);ctx.lineTo(x,p.t+6);ctx.closePath();ctx.fill();
+    ctx.textAlign=i?"left":"right";ctx.font="600 11.5px "+c.mono;ctx.fillText(l+" "+v.toFixed(2),x+(i?9:-9),p.t+6);
+  });
+  ctx.fillStyle=c.acc;ctx.textAlign="center";ctx.fillText("prediction "+r.m.toFixed(2),X(r.m),16);
+  ctx.beginPath();ctx.arc(X(r.m),Y(pdf(r.m,r.m,r.s)),4,0,7);ctx.fill();
+}
+function renderDecide(r){
+  ["lsl","usl","band"].forEach(k=>{if(document.activeElement!==$(k))$(k).value=k==="band"?S.band:S[k];});
+  drawDecide(r);
+  $("decTiles").innerHTML=T("Out of spec",pct(r.pOut),"")+T("Same group",pct(r.pGrp),"")+`<div class="tile"><span class="k">Decision</span><span><span class="pill ${r.risk}">${r.risk}</span></span></div>`;
+  const need=testsToLow(r),act={LOW:"Skip the panel test and cut on the prediction.",MEDIUM:"Test one roll from the batch.",HIGH:"Use the standard testing."}[r.risk];
+  let more="";
+  if(r.risk!=="LOW"){
+    const floor=Math.sqrt(r.sigma2+ROUND_VAR),pg=2*Phi(r.p.h/floor)-1,po=Phi((r.p.lsl-r.m)/floor)+1-Phi((r.p.usl-r.m)/floor);
+    more=need===null?` <b>More tests of this colour cannot reach LOW.</b> Test noise alone (±${f(floor,2)}) leaves ${pct(po)} out of spec and ${pct(pg)} in group. Widen the limits or the band, or use a less noisy test.`:` About <b>${need} more test${need===1?"":"s"}</b> of this colour with similar results would reach LOW.`;
+  }else more=" The prediction is certain enough to rely on.";
+  $("decRead").className="callout "+(r.risk==="LOW"?"good":r.risk==="MEDIUM"?"warn":"bad");
+  $("decRead").innerHTML=`<b>${S.colour} next batch: ${r.risk}.</b> ${act}${more}`;
+  const ok=(b)=>b?"✓":"✗";
+  $("decRules").innerHTML=`<tr><td>LOW needs P(out) ≤ 2% and P(group) ≥ 80%</td><td style="text-align:right;font-family:var(--mono)">${pct(r.pOut)} ${ok(r.pOut<=0.02)} · ${pct(r.pGrp)} ${ok(r.pGrp>=0.8)}</td></tr><tr><td>MEDIUM needs P(out) ≤ 10%</td><td style="text-align:right;font-family:var(--mono)">${pct(r.pOut)} ${ok(r.pOut<=0.10)}</td></tr>`;
+  const zL=(r.p.lsl-r.m)/r.s,zU=(r.p.usl-r.m)/r.s,zh=r.p.h/r.s;
+  $("eqDec").innerHTML=
+`below spec  z = (${f(r.p.lsl,2)} − ${f(r.m,3)}) / ${f(r.s,3)} = ${f(zL,2)}    Φ(z)   = ${pct(r.pLow)}
+above spec  z = (${f(r.p.usl,2)} − ${f(r.m,3)}) / ${f(r.s,3)} = ${f(zU,2)}    1−Φ(z) = ${pct(r.pHigh)}
+P(out of spec) = <b>${pct(r.pOut)}</b>
+
+same group  P(|y − m| ≤ ${f(r.p.h,2)}) = 2·Φ(${f(r.p.h,2)}/${f(r.s,3)}) − 1
+            = 2·Φ(${f(zh,2)}) − 1 = <b>${pct(r.pGrp)}</b>
+
+P(out) ${r.pOut<=0.02?"≤":">"} 2%  and  P(group) ${r.pGrp>=0.8?"≥":"<"} 80%   →  <b>${r.risk}</b>`;
+}
+function decPointer(e,type){
+  const cv=$("cvDec"),rc=cv.getBoundingClientRect(),px=e.clientX-rc.left,r=cur(),{x0,x1,X}=decGeom(r,DEC.w);
+  if(type==="down"){const dl=Math.abs(px-X(r.p.lsl)),du=Math.abs(px-X(r.p.usl));if(Math.min(dl,du)<14){DEC.drag=dl<du?"lsl":"usl";cv.setPointerCapture(e.pointerId);}}
+  else if(type==="move"&&DEC.drag){const v=x0+(px-DEC.pad.l)/(DEC.w-DEC.pad.l-DEC.pad.r)*(x1-x0);S[DEC.drag]=Math.round(v*20)/20;refresh();}
+  else if(type==="up")DEC.drag=null;
+}
+
+/*** step 7: replay ***/
+function buildReplay(){
+  const list=REPLAY[S.dir],p={...P(),b:0,dev:0};
+  const res=[],D={};let sv=0;
+  list.forEach((b,i)=>{
+    const[date,c,v,id]=b,r=model(D,c,p),lo=r.m-1.645*r.s,hi=r.m+1.645*r.s,naive=i?sv/i:p.mu0;
+    res.push({date,c,v,id,m:r.m,s:r.s,lo,hi,pOut:r.pOut,pGrp:r.pGrp,risk:r.risk,n:(D[c]||[]).length,seen:i,inside:v>=lo&&v<=hi,err:Math.abs(v-r.m),nerr:Math.abs(v-naive)});
+    (D[c]=D[c]||[]).push(v);sv+=v;
+  });
+  S.rp=res;$("rpScrub").max=res.length;S.rk=Math.min(S.rk,res.length);
+}
+function drawReplay(){
+  const g=fit($("cvRep"));if(!g)return;const{ctx,w,h}=g,c=colors(),pad={l:44,r:10,t:14,b:48},N=S.rp.length;
+  const y0=-2.2,y1=0.2,Y=v=>pad.t+(1-(v-y0)/(y1-y0))*(h-pad.t-pad.b-14),slot=(w-pad.l-pad.r)/N,X=i=>pad.l+slot*(i+0.5);
+  g_rep={slot,pad,N};
+  ctx.font="11px "+c.mono;ctx.textAlign="right";ctx.fillStyle=c.muted;ctx.strokeStyle=c.line;ctx.lineWidth=1;
+  for(let v=-2.0;v<=0.01;v+=0.5){ctx.beginPath();ctx.moveTo(pad.l,Y(v));ctx.lineTo(w-pad.r,Y(v));ctx.stroke();ctx.fillText(v.toFixed(1),pad.l-6,Y(v)+4);}
+  const base=h-pad.b-14;
+  S.rp.forEach((b,i)=>{
+    const x=X(i),shown=i<S.rk,curI=i===S.rk-1;
+    if(curI){ctx.fillStyle=c.line;ctx.globalAlpha=.45;ctx.fillRect(x-slot/2,pad.t,slot,h-pad.t-pad.b+4);ctx.globalAlpha=1;}
+    ctx.fillStyle=c.muted;ctx.font="9.5px "+c.mono;ctx.textAlign="center";ctx.save();ctx.translate(x,h-pad.b+4);ctx.rotate(Math.PI/2);ctx.textAlign="left";ctx.fillText(CODES[b.c],4,3);ctx.restore();
+    if(!shown){ctx.fillStyle=c.line;ctx.beginPath();ctx.arc(x,Y(b.v),3,0,7);ctx.fill();return;}
+    const bw=Math.min(14,slot*0.6),lo=clamp(b.lo,y0,y1),hi=clamp(b.hi,y0,y1);
+    ctx.fillStyle=c.accS;ctx.fillRect(x-bw/2,Y(hi),bw,Y(lo)-Y(hi));ctx.strokeStyle=c.acc;ctx.lineWidth=1;ctx.strokeRect(x-bw/2+.5,Y(hi),bw-1,Y(lo)-Y(hi));
+    ctx.fillStyle=c.acc;ctx.fillRect(x-bw/2,Y(b.m)-1,bw,2);
+    ctx.fillStyle=b.inside?c.good:c.bad;ctx.beginPath();ctx.arc(x,Y(b.v),4.2,0,7);ctx.fill();ctx.strokeStyle=c.panel;ctx.lineWidth=1.2;ctx.stroke();
+    ctx.fillStyle=b.risk==="LOW"?c.good:b.risk==="MEDIUM"?c.warn:c.bad;ctx.fillRect(x-slot/2+1,h-pad.b-12,slot-2,6);
+  });
+}
+let g_rep=null;
+function renderReplay(){
+  buildReplay();drawReplay();
+  const k=S.rk,sh=S.rp.slice(0,k);
+  $("rpScrub").value=k;$("rpPlay").textContent=S.playing?"Pause":(k>=S.rp.length?"Replay":"Play");
+  $("rpBack").disabled=k<=0;$("rpNext").disabled=k>=S.rp.length;
+  const b=sh[k-1];
+  if(!b)$("rpNow").innerHTML="Press play or step forward. Before the first batch the model has seen nothing, so its range is as wide as the prior.";
+  else $("rpNow").innerHTML=`<b>Batch ${k} of ${S.rp.length}</b> · ${b.date} · ${b.c} (${CODES[b.c]})<br>The model had seen <b>${b.seen}</b> earlier batches, <b>${b.n}</b> of this colour. It predicted <b>${f(b.m,2)}%</b> with a 90% range of <b>${f(b.lo,2)} to ${f(b.hi,2)}</b> and rated the batch <span class="pill ${b.risk}">${b.risk}</span> (out of spec ${pct(b.pOut)}). The test then read <b>${f(b.v,2)}%</b>, <b>${b.inside?"inside":"outside"}</b> the range, off by ${f(b.err,2)}.`;
+  const hit=sh.length?sh.filter(x=>x.inside).length/sh.length*100:NaN;
+  const late=sh.filter(x=>x.seen>=3),mae=late.length?mean(late.map(x=>x.err)):NaN,nmae=late.length?mean(late.map(x=>x.nerr)):NaN;
+  const low=sh.length?sh.filter(x=>x.risk==="LOW").length/sh.length:NaN;
+  const buy=+$("cBuy").value||0,roll=+$("cRoll").value||1,pc=+$("cPct").value||0,price=+$("cPrice").value||0,cost=buy/roll*pc/100*price;
+  $("rpTiles").innerHTML=T("Hit rate (target 90%)",f(hit,0),"%")+T("Typical error (after 3)",f(mae,3),"%")+T("Plain average error",f(nmae,3),"%")+T("Rated LOW",f(low*100,0),"%")+T("Fabric saving if that share held for SS27",Number.isFinite(low)?"$"+Math.round(low*cost).toLocaleString():"–","");
+  $("eqRep").innerHTML=
+`for each batch i, using only batches before it:
+  fit σ², τ², IM and colour posteriors  →  m, s
+  90% range = m ± 1.645·s
+  hit  = actual inside the range
+  error = |actual − m|
+  plain average = mean of all earlier results
+
+hit rate    = hits / batches so far = ${sh.filter(x=>x.inside).length} / ${sh.length}
+model error = ${f(mae,3)}   plain average error = ${f(nmae,3)}   (scored from batch 4 on)
+LOW share   = ${sh.filter(x=>x.risk==="LOW").length} / ${sh.length}
+saving      = LOW share × panel fabric cost (from step 1) = ${Number.isFinite(low)?f(low*100,0):"–"}% × $${Math.round(cost).toLocaleString()}`;
+}
+function rpStop(){S.playing=false;clearInterval(rpTimer);}
+let rpTimer=null;
+function rpPlay(){
+  if(S.playing){rpStop();renderReplay();return;}
+  if(S.rk>=S.rp.length)S.rk=0;
+  S.playing=true;
+  const tick=()=>{if(S.rk>=S.rp.length){rpStop();renderReplay();return;}S.rk++;renderReplay();};
+  tick();rpTimer=setInterval(tick,+$("rpSpeed").value);renderReplay();
+}
+
+/*** shared UI ***/
+function renderCtx(){
+  const D=S.data[S.dir];
+  $("colours").innerHTML=Object.keys(D).map(c=>`<button class="chip" aria-pressed="${c===S.colour}" data-c="${c}">${c} <small>${CODES[c]} · ${D[c].length}</small></button>`).join("");
+  $("dirL").setAttribute("aria-pressed",S.dir==="L");$("dirW").setAttribute("aria-pressed",S.dir==="W");
+  $("ctxDir").hidden=S.step==="problem";
+  $("ctxCol").hidden=!["colour","predict","decide"].includes(S.step);
+  $("ctx").style.display=($("ctxDir").hidden&&$("ctxCol").hidden)?"none":"flex";
+}
+function refresh(){
+  renderCtx();
+  const r=cur();
+  switch(S.step){
+    case"problem":drawProblem();break;
+    case"variation":
+      $("vWithin").setAttribute("aria-pressed",S.vmode==="within");$("vBetween").setAttribute("aria-pressed",S.vmode==="between");
+      $("legWithin").hidden=S.vmode!=="within";$("legBetween").hidden=S.vmode!=="between";
+      drawStrip(r);
+      $("varTiles").innerHTML=T("Test noise σ",f(Math.sqrt(r.sigma2),3),"%")+T("Colour drift τ",f(Math.sqrt(r.tau2),3),"%")+T("Tests used",sum(r.cols.map(c=>S.data[S.dir][c].length)),"")+T("Colours",r.cols.length,"");
+      const rowsTxt=r.rows.map(([c,n,v])=>`  ${c.padEnd(7)} n=${String(n).padStart(2)}  var=${f(v,4)}  (n−1)·var=${f(v*(n-1),4)}`).join("\n");
+      $("eqVar").innerHTML=
+`within each colour (test noise)
+${rowsTxt||"  (no colour has two tests yet)"}
+
+       Σ(n−1)·var + 3×0.25²     ${f(r.ss,4)} + 0.1875
+σ² = ─────────────────────── = ───────────────── = <b>${f(r.sigma2,5)}</b>
+         Σ(n−1) + 3              ${r.dof} + 3
+σ  = <b>${f(Math.sqrt(r.sigma2),3)} %</b>
+
+between colours (drift)
+  colour averages: ${r.means.map(x=>f(x,2)).join("  ")}
+  Var(averages) = ${f(r.vMeans,5)}      σ²/n̄ = ${f(r.sigma2,5)}/${f(r.nbar,2)} = ${f(r.sigma2/r.nbar,5)}
+  τ² = ${f(r.tauRaw,5)}  → floor at 0.01  → <b>${f(r.tau2,4)}</b>      τ = <b>${f(Math.sqrt(r.tau2),3)} %</b>
+  (the "3 imaginary batches at 0.25" and the floor stop tiny samples from looking perfect)`;
+      break;
+    case"baseline":renderBaseline(r);break;
+    case"colour":renderColour(r);break;
+    case"predict":renderPredict(r);break;
+    case"decide":renderDecide(r);break;
+    case"replay":renderReplay();break;
+  }
+}
+function go(id){
+  if(!STEPS.some(s=>s.id===id))id="problem";
+  if(S.playing)rpStop();
+  S.step=id;S.visited[id]=true;
+  document.querySelectorAll(".step").forEach(el=>el.classList.toggle("on",el.id==="s-"+id));
+  const i=STEPS.findIndex(s=>s.id===id);
+  $("rail").innerHTML=STEPS.map((s,j)=>`<button class="pillstep${S.visited[s.id]&&j!==i?" done":""}" data-s="${s.id}" ${j===i?'aria-current="step"':""}><span class="n">STEP ${j+1}</span><span class="t">${s.t}</span><span class="s">${s.s}</span></button>`).join("");
+  $("back").disabled=i===0;$("next").disabled=i===STEPS.length-1;$("next").textContent=i===STEPS.length-1?"Done":"Next: "+(STEPS[i+1]||{t:""}).t;
+  $("pageInfo").textContent=(i+1)+" of "+STEPS.length;
+  try{if(location.hash!=="#"+id)location.hash=id;}catch(e){}
+  refresh();
+  const cur=document.querySelector('.pillstep[aria-current="step"]');if(cur&&cur.scrollIntoView)cur.scrollIntoView({block:"nearest",inline:"center"});
+}
+
+/*** events ***/
+$("rail").addEventListener("click",e=>{const b=e.target.closest("[data-s]");if(b)go(b.dataset.s);});
+$("back").addEventListener("click",()=>go(STEPS[Math.max(0,STEPS.findIndex(s=>s.id===S.step)-1)].id));
+$("next").addEventListener("click",()=>go(STEPS[Math.min(STEPS.length-1,STEPS.findIndex(s=>s.id===S.step)+1)].id));
+$("colours").addEventListener("click",e=>{const b=e.target.closest("[data-c]");if(b){S.colour=b.dataset.c;refresh();}});
+[["dirL","L"],["dirW","W"]].forEach(([id,d])=>$(id).addEventListener("click",()=>{S.dir=d;S.rk=0;if(S.playing)rpStop();if(!S.data[S.dir][S.colour])S.colour=Object.keys(S.data[S.dir])[0];refresh();}));
+$("resetAll").addEventListener("click",()=>{if(S.playing)rpStop();const st=S.step,vis=S.visited;S=Object.assign(DEFAULTS(),{step:st,visited:vis});["pL","pW"].forEach((id,i)=>$(id).value=[-1.1,-1.2][i]);$("gA").value=-0.8;$("gB").value=-1.2;$("pMag").value=10;$("cBuy").value=12344073;$("cRoll").value=60;$("cPct").value=10;$("cPrice").value=3;$("cShare").value=70;go(st);});
+["pL","pW","pMag","gA","gB","cBuy","cRoll","cPct","cPrice","cShare"].forEach(id=>$(id).addEventListener("input",refresh));
+$("vWithin").addEventListener("click",()=>{S.vmode="within";refresh();});$("vBetween").addEventListener("click",()=>{S.vmode="between";refresh();});
+const cs=$("cvStrip");cs.addEventListener("pointerdown",e=>stripPointer(e,"down"));cs.addEventListener("pointermove",e=>stripPointer(e,"move"));cs.addEventListener("pointerup",e=>stripPointer(e,"up"));cs.addEventListener("pointercancel",e=>stripPointer(e,"up"));
+cs.addEventListener("dblclick",e=>{const rc=cs.getBoundingClientRect(),px=e.clientX-rc.left,py=e.clientY-rc.top;let best=null,bd=12;STRIP.hit.forEach(o=>{const d=Math.hypot(o.x-px,o.y-py);if(d<bd){bd=d;best=o;}});if(best){S.data[S.dir][best.c].splice(best.i,1);refresh();}});
+$("pmu").addEventListener("input",e=>{S.pmu=+e.target.value;refresh();});
+$("psd").addEventListener("input",e=>{S.psd=+e.target.value;refresh();});
+$("kIn").addEventListener("input",e=>{S.kIn=+e.target.value;refresh();});
+$("sigScale").addEventListener("input",e=>{S.sigScale=+e.target.value;refresh();});
+$("tests").addEventListener("click",e=>{const b=e.target.closest("[data-i]");if(b){S.data[S.dir][S.colour].splice(+b.dataset.i,1);refresh();}});
+$("addTest").addEventListener("click",()=>{const v=parseFloat($("newTest").value);if(Number.isFinite(v)&&v>-5&&v<3){S.data[S.dir][S.colour].push(Math.round(v*100)/100);refresh();}});
+$("newTest").addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();$("addTest").click();}});
+$("resetCol").addEventListener("click",()=>{S.data[S.dir][S.colour]=[...SAP[S.dir][S.colour]];refresh();});
+$("cvCol").addEventListener("click",e=>{const cv=$("cvCol"),m=cv._map;if(!m)return;const px=e.clientX-cv.getBoundingClientRect().left;const v=m.xr[0]+(px-m.p.l)/(m.w-m.p.l-m.p.r)*(m.xr[1]-m.xr[0]);if(v>-2.4&&v<0.4){S.data[S.dir][S.colour].push(Math.round(v*10)/10);refresh();}});
+$("dev").addEventListener("input",e=>{S.dev=+e.target.value;refresh();});
+$("coef").addEventListener("input",e=>{S.b=+e.target.value||0;refresh();});
+$("draw1").addEventListener("click",()=>drawSim(1));$("draw25").addEventListener("click",()=>drawSim(25));$("draw500").addEventListener("click",()=>drawSim(500));
+$("clearSim").addEventListener("click",()=>{if(simTimer)cancelAnimationFrame(simTimer);S.sim.vals=[];S.sim.last=null;$("simRead").textContent="Press a draw button to simulate batches from the model's curve.";refresh();});
+["lsl","usl","band"].forEach(id=>$(id).addEventListener("input",e=>{const v=parseFloat(e.target.value);if(Number.isFinite(v)){S[id]=v;refresh();}}));
+const cd=$("cvDec");cd.addEventListener("pointerdown",e=>decPointer(e,"down"));cd.addEventListener("pointermove",e=>decPointer(e,"move"));cd.addEventListener("pointerup",e=>decPointer(e,"up"));cd.addEventListener("pointercancel",e=>decPointer(e,"up"));
+$("rpPlay").addEventListener("click",rpPlay);
+$("rpNext").addEventListener("click",()=>{rpStop();S.rk=Math.min(S.rp.length,S.rk+1);refresh();});
+$("rpBack").addEventListener("click",()=>{rpStop();S.rk=Math.max(0,S.rk-1);refresh();});
+$("rpReset").addEventListener("click",()=>{rpStop();S.rk=0;refresh();});
+$("rpScrub").addEventListener("input",e=>{rpStop();S.rk=+e.target.value;refresh();});
+$("rpSpeed").addEventListener("change",()=>{if(S.playing){clearInterval(rpTimer);const tick=()=>{if(S.rk>=S.rp.length){rpStop();renderReplay();return;}S.rk++;renderReplay();};rpTimer=setInterval(tick,+$("rpSpeed").value);}});
+$("cvRep").addEventListener("click",e=>{if(!g_rep)return;const px=e.clientX-$("cvRep").getBoundingClientRect().left;const i=Math.floor((px-g_rep.pad.l)/g_rep.slot);if(i>=0&&i<g_rep.N){rpStop();S.rk=i+1;refresh();}});
+new ResizeObserver(()=>refresh()).observe(document.querySelector(".wrap"));
+window.addEventListener("hashchange",()=>{const id=location.hash.slice(1);if(id&&id!==S.step)go(id);});
+window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change",refresh);
+new MutationObserver(refresh).observe(document.documentElement,{attributes:true,attributeFilter:["data-theme"]});
+go((location.hash||"#problem").slice(1));
+</script>
+</body>
+</html>
